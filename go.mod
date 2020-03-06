@@ -3,6 +3,7 @@ module github.com/elcuervo/nestor
 go 1.13
 
 require (
+	github.com/briandowns/spinner v1.9.0
 	github.com/cretz/bine v0.1.0
 	github.com/ipsn/go-libtor v1.0.189
 	github.com/stretchr/testify v1.5.1 // indirect

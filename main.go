@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/briandowns/spinner"
 	"github.com/cretz/bine/tor"
 	"github.com/ipsn/go-libtor"
 )
@@ -22,13 +22,23 @@ const logo = `
 `
 
 func main() {
-	log.Println(logo)
-	log.Println("Finding an available tor address..")
+	fmt.Println(logo)
 
-	t, err := tor.Start(nil, &tor.StartConf{ProcessCreator: libtor.Creator, DebugWriter: os.Stderr})
+	s := spinner.New(spinner.CharSets[4], 100*time.Millisecond)
+	c := make(chan os.Signal, 2)
+
+	s.Suffix = " Finding an available tor address."
+	s.Start()
+
+	go func() {
+		<-c
+		os.Exit(0)
+	}()
+
+	t, err := tor.Start(nil, &tor.StartConf{ProcessCreator: libtor.Creator})
 
 	if err != nil {
-		log.Panicf("Unable to start Tor: %v", err)
+		fmt.Errorf("Unable to start Tor: %v", err)
 	}
 
 	defer t.Close()
@@ -40,23 +50,20 @@ func main() {
 	onion, err := t.Listen(listenCtx, &tor.ListenConf{RemotePorts: []int{80}})
 
 	if err != nil {
-		log.Panicf("Unable to create onion service: %v", err)
+		fmt.Errorf("Unable to create onion service: %v", err)
 	}
 
 	defer onion.Close()
 
-	log.Printf("Go to http://%v.onion\n", onion.ID)
-	log.Println("Press enter to exit")
+	s.Stop()
+
+	fmt.Printf("Go to http://%v.onion\n", onion.ID)
 
 	errCh := make(chan error, 1)
 
 	go func() { errCh <- http.Serve(onion, http.FileServer(http.Dir("."))) }()
-	go func() {
-		fmt.Scanln()
-		errCh <- nil
-	}()
 
 	if err = <-errCh; err != nil {
-		log.Panicf("Failed serving: %v", err)
+		fmt.Errorf("Failed serving: %v", err)
 	}
 }

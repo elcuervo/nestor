@@ -8,5 +8,6 @@
 ```
 
 ```bash
-nestor
+make build
+bin/nestor
 ```
