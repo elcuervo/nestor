@@ -9,7 +9,7 @@ format:
 
 build:
 	@echo "==> Building ..."
-	@go build -o bin/nestor .
+	@go build -v -x -o bin/nestor .
 
 clean:
 	@rm nestor
