@@ -1,7 +1,13 @@
+PHONY: all format test
+
 all:
 	@mkdir -p bin/
 	@echo "==> Installing dependencies"
 	@go get -d -v ./...
+
+update:
+	@go get -u
+	@go mod tidy
 
 format:
 	@echo "==> Formating project ..."
@@ -18,5 +24,3 @@ test:
 	@echo "==> Testing nestor ..."
 	@go list -f '{{range .TestImports}}{{.}} {{end}}' ./... | xargs -n1 go get -d
 	go test ./...
-
-PHONY: all format test
