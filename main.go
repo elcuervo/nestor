@@ -9,22 +9,50 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/cretz/bine/tor"
+	"github.com/fatih/color"
 	"github.com/ulikunitz/xz"
 )
 
-const logo = `
+var (
+	purple = color.New(color.FgMagenta, color.Bold)
+	green  = color.New(color.FgGreen, color.Bold)
+	cyan   = color.New(color.FgCyan)
+	dim    = color.New(color.Faint)
+	bold   = color.New(color.Bold)
+	red    = color.New(color.FgRed, color.Bold)
+)
+
+const logoText = `
                   _
   _ __   ___  ___| |_ ___  _ __
  | '_ \ / _ \/ __| __/ _ \| '__|
  | | | |  __/\__ \ || (_) | |
  |_| |_|\___||___/\__\___/|_|
-     NEtwork Share via TOR
-`
+     NEtwork Share via TOR`
+
+func urlBox(url string) string {
+	bar := strings.Repeat("─", len(url)+4)
+	return fmt.Sprintf("\n  ┌%s┐\n  │  %s  │\n  └%s┘", bar, bold.Sprint(url), bar)
+}
+
+func runPhase(s *spinner.Spinner, spinMsg, doneMsg string, fn func() error) error {
+	s.Suffix = "  " + spinMsg
+	s.Start()
+	err := fn()
+	if err != nil {
+		s.FinalMSG = red.Sprint("  ✗ ") + spinMsg + "\n"
+	} else {
+		s.FinalMSG = green.Sprint("  ✓ ") + doneMsg + "\n"
+	}
+	s.Stop()
+	return err
+}
 
 func decompress(data []byte) ([]byte, error) {
 	r, err := xz.NewReader(bytes.NewReader(data))
@@ -63,18 +91,22 @@ func extractTor() (string, func(), error) {
 }
 
 func main() {
-	fmt.Println(logo)
+	purple.Print(logoText)
+	fmt.Print("\n\n")
 
-	s := spinner.New(spinner.CharSets[4], 100*time.Millisecond)
+	s := spinner.New(spinner.CharSets[11], 80*time.Millisecond)
+
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-	s.Suffix = " Finding an available tor address."
-	s.Start()
-
-	torPath, cleanup, err := extractTor()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to extract Tor: %v\n", err)
+	var torPath string
+	var cleanup func()
+	if err := runPhase(s, "Extracting Tor binary...", "Tor binary extracted", func() error {
+		var err error
+		torPath, cleanup, err = extractTor()
+		return err
+	}); err != nil {
+		red.Fprintf(os.Stderr, "  Error: %v\n", err)
 		os.Exit(1)
 	}
 	defer cleanup()
@@ -85,38 +117,46 @@ func main() {
 		os.Exit(0)
 	}()
 
-	t, err := tor.Start(nil, &tor.StartConf{ExePath: torPath})
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to start Tor: %v\n", err)
+	var t *tor.Tor
+	if err := runPhase(s, "Starting Tor process...", "Tor process started", func() error {
+		var err error
+		t, err = tor.Start(nil, &tor.StartConf{ExePath: torPath})
+		return err
+	}); err != nil {
+		red.Fprintf(os.Stderr, "  Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	defer t.Close()
 
 	listenCtx, listenCancel := context.WithTimeout(context.Background(), 3*time.Minute)
-
 	defer listenCancel()
 
-	onion, err := t.Listen(listenCtx, &tor.ListenConf{RemotePorts: []int{80}, Version3: true})
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create onion service: %v\n", err)
+	var onion *tor.OnionService
+	if err := runPhase(s, "Creating onion service...", "Onion service ready", func() error {
+		var err error
+		onion, err = t.Listen(listenCtx, &tor.ListenConf{RemotePorts: []int{80}, Version3: true})
+		return err
+	}); err != nil {
+		red.Fprintf(os.Stderr, "  Error: %v\n", err)
 		os.Exit(1)
 	}
-
 	defer onion.Close()
 
-	s.Stop()
+	url := fmt.Sprintf("http://%v.onion", onion.ID)
+	fmt.Println(urlBox(url))
 
-	fmt.Printf("Go to http://%v.onion\n", onion.ID)
+	dir, _ := os.Getwd()
+	fmt.Printf("\n  Serving ")
+	cyan.Println(dir)
+	fmt.Println()
+	dim.Println("  Press Ctrl+C to stop")
+	fmt.Println()
 
 	errCh := make(chan error, 1)
-
 	go func() { errCh <- http.Serve(onion, http.FileServer(http.Dir("."))) }()
 
-	if err = <-errCh; err != nil {
-		fmt.Fprintf(os.Stderr, "Failed serving: %v\n", err)
+	if err := <-errCh; err != nil {
+		red.Fprintf(os.Stderr, "\n  ✗ Failed serving: %v\n", err)
 		os.Exit(1)
 	}
 }

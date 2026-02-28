@@ -5,11 +5,11 @@ go 1.25
 require (
 	github.com/briandowns/spinner v1.9.0
 	github.com/cretz/bine v0.1.0
+	github.com/fatih/color v1.7.0
 	github.com/ulikunitz/xz v0.5.15
 )
 
 require (
-	github.com/fatih/color v1.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/mattn/go-isatty v0.0.8 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
