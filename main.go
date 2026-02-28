@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -62,6 +64,27 @@ func decompress(data []byte) ([]byte, error) {
 	return io.ReadAll(r)
 }
 
+func proxyPort(l net.Listener, port int) error {
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			return err
+		}
+		go func(c net.Conn) {
+			defer c.Close()
+			target, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
+			if err != nil {
+				return
+			}
+			defer target.Close()
+			done := make(chan struct{}, 2)
+			go func() { io.Copy(target, c); done <- struct{}{} }()
+			go func() { io.Copy(c, target); done <- struct{}{} }()
+			<-done
+		}(conn)
+	}
+}
+
 func extractTor() (string, func(), error) {
 	dir, err := os.MkdirTemp("", fmt.Sprintf("nestor-tor-%d-*", os.Getpid()))
 	if err != nil {
@@ -91,6 +114,11 @@ func extractTor() (string, func(), error) {
 }
 
 func main() {
+	var port int
+	flag.IntVar(&port, "port", 0, "Local port to forward through Tor (default: serve current directory)")
+	flag.IntVar(&port, "p", 0, "Local port to forward (shorthand)")
+	flag.Parse()
+
 	purple.Print(logoText)
 	fmt.Print("\n\n")
 
@@ -145,15 +173,25 @@ func main() {
 	url := fmt.Sprintf("http://%v.onion", onion.ID)
 	fmt.Println(urlBox(url))
 
-	dir, _ := os.Getwd()
-	fmt.Printf("\n  Serving ")
-	cyan.Println(dir)
+	if port != 0 {
+		fmt.Printf("\n  Forwarding ")
+		cyan.Printf("localhost:%d", port)
+		fmt.Println(" → Tor")
+	} else {
+		dir, _ := os.Getwd()
+		fmt.Printf("\n  Serving ")
+		cyan.Println(dir)
+	}
 	fmt.Println()
 	dim.Println("  Press Ctrl+C to stop")
 	fmt.Println()
 
 	errCh := make(chan error, 1)
-	go func() { errCh <- http.Serve(onion, http.FileServer(http.Dir("."))) }()
+	if port != 0 {
+		go func() { errCh <- proxyPort(onion, port) }()
+	} else {
+		go func() { errCh <- http.Serve(onion, http.FileServer(http.Dir("."))) }()
+	}
 
 	if err := <-errCh; err != nil {
 		red.Fprintf(os.Stderr, "\n  ✗ Failed serving: %v\n", err)
