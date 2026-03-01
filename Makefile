@@ -47,12 +47,17 @@ tor_binaries/linux-amd64/tor.xz:
 	@echo "==> Downloading Tor $(TOR_LINUX_VERSION) for linux/amd64 ..."
 	@tmpdir=$$(mktemp -d) && \
 		curl -sSL $(TOR_BASE_URL)/$(TOR_LINUX_VERSION)/tor-browser-linux-x86_64-$(TOR_LINUX_VERSION).tar.xz | \
-		tar -xJf - -C $$tmpdir --strip-components=4 tor-browser/Browser/TorBrowser/Tor/tor && \
+		tar -xJf - -C $$tmpdir --strip-components=4 \
+			tor-browser/Browser/TorBrowser/Tor/tor \
+			tor-browser/Browser/TorBrowser/Tor/libevent-2.1.so.7 && \
 		mv $$tmpdir/tor tor_binaries/linux-amd64/tor && \
+		mv $$tmpdir/libevent-2.1.so.7 tor_binaries/linux-amd64/libevent-2.1.so.7 && \
 		rm -rf $$tmpdir
 	@chmod +x tor_binaries/linux-amd64/tor
 	@xz -9 -f tor_binaries/linux-amd64/tor
+	@xz -9 -f tor_binaries/linux-amd64/libevent-2.1.so.7
 	@echo "    tor_binaries/linux-amd64/tor.xz"
+	@echo "    tor_binaries/linux-amd64/libevent-2.1.so.7.xz"
 
 # macOS and Windows: expert bundles (last stable release: 13.5.29, .tar.gz format)
 tor_binaries/darwin-amd64/tor.xz:

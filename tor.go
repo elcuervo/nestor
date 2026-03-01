@@ -18,13 +18,17 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
-type silentCreator struct{ exePath string }
+type silentCreator struct {
+	exePath string
+	stderr  *bytes.Buffer
+}
 type silentProcess struct{ *exec.Cmd }
 
 func (s *silentCreator) New(ctx context.Context, args ...string) (process.Process, error) {
 	cmd := exec.CommandContext(ctx, s.exePath, args...)
 	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	cmd.Stderr = s.stderr
+	cmd.Env = append(os.Environ(), "LD_LIBRARY_PATH="+filepath.Dir(s.exePath))
 	return &silentProcess{cmd}, nil
 }
 
@@ -33,10 +37,15 @@ func (s *silentProcess) EmbeddedControlConn() (net.Conn, error) {
 }
 
 func startTor(path string) (*tor.Tor, error) {
-	return tor.Start(nil, &tor.StartConf{
-		ProcessCreator: &silentCreator{exePath: path},
+	var stderr bytes.Buffer
+	t, err := tor.Start(nil, &tor.StartConf{
+		ProcessCreator: &silentCreator{exePath: path, stderr: &stderr},
 		DebugWriter:    io.Discard,
 	})
+	if err != nil && stderr.Len() > 0 {
+		return nil, fmt.Errorf("%w\n%s", err, stderr.String())
+	}
+	return t, err
 }
 
 func extractTor() (string, func(), error) {
