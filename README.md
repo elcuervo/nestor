@@ -12,7 +12,17 @@
 
 ## Install
 
-Download a release binary from the [releases page](https://github.com/elcuervo/nestor/releases).
+**macOS / Linux**
+```bash
+curl -fsSL https://raw.githubusercontent.com/elcuervo/nestor/master/install.sh | sh
+```
+
+**Windows** (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/elcuervo/nestor/master/install.ps1 | iex
+```
+
+Or download a binary from the [releases page](https://github.com/elcuervo/nestor/releases).
 
 ## Build from source
 
