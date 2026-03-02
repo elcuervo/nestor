@@ -10,6 +10,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+func validatePort(port int) error {
+	if port == 0 {
+		return nil
+	}
+	if port < minPort || port > maxPort {
+		return fmt.Errorf("port %d is out of range: must be between %d and %d", port, minPort, maxPort)
+	}
+	return nil
+}
+
 func main() {
 	var port int
 	var quiet bool
@@ -18,6 +28,11 @@ func main() {
 	flag.BoolVar(&quiet, "quiet", false, "Only print the onion URL")
 	flag.BoolVar(&quiet, "q", false, "Only print the onion URL (shorthand)")
 	flag.Parse()
+
+	if err := validatePort(port); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 
 	if quiet {
 		runQuiet(port)

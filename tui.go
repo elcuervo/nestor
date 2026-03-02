@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -63,6 +62,7 @@ func phaseIsDone(done []phase, p phase) bool {
 
 type extractDoneMsg struct {
 	torPath string
+	dataDir string
 	cleanup func()
 	err     error
 }
@@ -98,21 +98,21 @@ type model struct {
 
 func cmdExtractTor() tea.Cmd {
 	return func() tea.Msg {
-		torPath, cleanup, err := extractTor()
-		return extractDoneMsg{torPath: torPath, cleanup: cleanup, err: err}
+		torPath, dataDir, cleanup, err := extractTor()
+		return extractDoneMsg{torPath: torPath, dataDir: dataDir, cleanup: cleanup, err: err}
 	}
 }
 
-func cmdStartTor(path string) tea.Cmd {
+func cmdStartTor(path, dataDir string) tea.Cmd {
 	return func() tea.Msg {
-		t, err := startTor(path)
+		t, err := startTor(path, dataDir)
 		return torStartedMsg{t: t, err: err}
 	}
 }
 
 func cmdCreateOnion(t *tor.Tor, ctx context.Context) tea.Cmd {
 	return func() tea.Msg {
-		onion, err := t.Listen(ctx, &tor.ListenConf{RemotePorts: []int{80}, Version3: true})
+		onion, err := t.Listen(ctx, &tor.ListenConf{RemotePorts: []int{torRemotePort}, Version3: true})
 		return onionReadyMsg{onion: onion, err: err}
 	}
 }
@@ -176,7 +176,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cleanup = msg.cleanup
 		m.donePhases = append(m.donePhases, phaseExtracting)
 		m.currentPhase = phaseStartingTor
-		return m, cmdStartTor(m.torPath)
+		return m, cmdStartTor(m.torPath, msg.dataDir)
 
 	case torStartedMsg:
 		if msg.err != nil {
@@ -185,7 +185,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmdCleanupAndQuit(m)
 		}
 		m.t = msg.t
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), onionCreateTimeout)
 		m.listenCancel = cancel
 		m.donePhases = append(m.donePhases, phaseStartingTor)
 		m.currentPhase = phaseCreatingOnion
@@ -244,7 +244,10 @@ func (m model) View() string {
 		if m.port != 0 {
 			b.WriteString(styleInfo.Render(fmt.Sprintf("Forwarding localhost:%d → Tor", m.port)))
 		} else {
-			dir, _ := os.Getwd()
+			dir, err := os.Getwd()
+			if err != nil {
+				dir = "(unknown directory)"
+			}
 			b.WriteString(styleInfo.Render("Serving " + dir))
 		}
 		b.WriteString("\n")
