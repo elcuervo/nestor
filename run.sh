@@ -19,5 +19,5 @@ esac
 
 TMP=$(mktemp)
 curl -fsSL "https://github.com/elcuervo/nestor/releases/latest/download/nestor-${OS}-${ARCH}" -o "$TMP"
-chmod +x "$TMP" && mv "$TMP" ./nestor && TMP=""
-./nestor
+chmod +x "$TMP"
+"$TMP" "$@"
