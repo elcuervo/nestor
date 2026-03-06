@@ -1,5 +1,3 @@
-data-dir*
-bin
+bin/
+vendor/
 tor_binaries/
-nestor
-.env
