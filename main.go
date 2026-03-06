@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,6 +28,17 @@ func main() {
 	flag.IntVar(&port, "p", 0, "Local port to forward (shorthand)")
 	flag.BoolVar(&quiet, "quiet", false, "Only print the onion URL")
 	flag.BoolVar(&quiet, "q", false, "Only print the onion URL (shorthand)")
+	flag.Usage = func() {
+		fmt.Println(strings.Join([]string{
+			indentBlock(styleLogo.Render(strings.TrimSpace(logoText))),
+			"",
+			indent + styleSuccess.Render(tagLine),
+			"",
+			indent + styleInfo.Render(madeBy),
+			"",
+		}, "\n"))
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	if err := validatePort(port); err != nil {

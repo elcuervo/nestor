@@ -33,7 +33,13 @@ const logoText = `
 
 `
 
+const indent = "  "
 const tagLine = "NEtwork Share via TOR"
+const madeBy = "made with ☠️ by elcuervo"
+
+func indentBlock(s string) string {
+	return indent + strings.ReplaceAll(s, "\n", "\n"+indent)
+}
 
 type phase int
 
@@ -218,47 +224,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	var b strings.Builder
+	lines := []string{
+		indentBlock(styleLogo.Render(strings.TrimSpace(logoText))),
+		"",
+		indent + styleSuccess.Render(tagLine),
+		"",
+		indent + styleInfo.Render(madeBy),
+		"",
+	}
 
-	b.WriteString(styleLogo.Render(strings.TrimSpace(logoText)))
-	b.WriteString("\n")
-	b.WriteString(styleSuccess.Render(tagLine))
-	b.WriteString("\n\n")
-
-	phases := []phase{phaseExtracting, phaseStartingTor, phaseCreatingOnion}
-	for _, p := range phases {
+	for _, p := range []phase{phaseExtracting, phaseStartingTor, phaseCreatingOnion} {
 		label := phaseLabel[p]
 		if phaseIsDone(m.donePhases, p) {
-			b.WriteString(styleSuccess.Render("✓ " + label))
-			b.WriteString("\n")
+			lines = append(lines, indent+styleSuccess.Render("✓ "+label))
 		} else if m.currentPhase == p {
-			b.WriteString(m.spinner.View() + " " + styleSuccess.Render(label) + "\n")
+			lines = append(lines, indent+m.spinner.View()+" "+styleSuccess.Render(label))
 		}
 	}
 
 	switch m.currentPhase {
 	case phaseRunning:
-		b.WriteString("\n")
-		b.WriteString(styleBox.Render(m.onionURL))
-		b.WriteString("\n")
-		if m.port != 0 {
-			b.WriteString(styleInfo.Render(fmt.Sprintf("Forwarding localhost:%d → Tor", m.port)))
-		} else {
-			dir, err := os.Getwd()
-			if err != nil {
-				dir = "(unknown directory)"
-			}
-			b.WriteString(styleInfo.Render("Serving " + dir))
+		dir, err := os.Getwd()
+		if err != nil {
+			dir = "(unknown directory)"
 		}
-		b.WriteString("\n")
-		b.WriteString(styleInfo.Render("Press Ctrl+C to stop"))
-		b.WriteString("\n")
+		location := styleInfo.Render("Serving " + dir)
+		if m.port != 0 {
+			location = styleInfo.Render(fmt.Sprintf("Forwarding localhost:%d → Tor", m.port))
+		}
+		lines = append(lines, "", indent+styleBox.Render(m.onionURL), indent+location, indent+styleInfo.Render("Press Ctrl+C to stop"), "")
 
 	case phaseError:
-		b.WriteString("\n")
-		b.WriteString(styleError.Render(fmt.Sprintf("Error: %v", m.err)))
-		b.WriteString("\n")
+		lines = append(lines, "", indent+styleError.Render(fmt.Sprintf("Error: %v", m.err)), "")
 	}
 
-	return b.String()
+	return strings.Join(lines, "\n")
 }
