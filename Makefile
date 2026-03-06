@@ -5,7 +5,7 @@ TOR_BUNDLE_VERSION ?= 13.5.29
 TOR_BASE_URL = https://dist.torproject.org/torbrowser
 LDFLAGS = -ldflags="-s -w" -trimpath
 
-.PHONY: all format test build build-all clean update download-tor \
+.PHONY: all format lint test build build-all clean update download-tor \
         download-tor-linux-amd64 download-tor-darwin-amd64 \
         download-tor-darwin-arm64 download-tor-windows-amd64
 
@@ -17,7 +17,11 @@ update:
 
 format:
 	@echo "==> Formatting project ..."
-	go fmt ./...
+	@goimports -w .
+
+lint:
+	@echo "==> Linting project ..."
+	@staticcheck ./...
 
 build:
 	@echo "==> Building ..."
